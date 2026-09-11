@@ -7,6 +7,8 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
+const YTM_BOOTSTRAP_PARAMS: [(&str, &str); 2] = [("cbrd", "1"), ("ucbcb", "1")];
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NoAuthToken {
     create_time: chrono::DateTime<Utc>,
@@ -21,7 +23,10 @@ impl NoAuthToken {
             ("X-Origin", YTM_URL.into()),
             ("Content-Type", "application/json".into()),
         ];
-        let result_text = client.get_query(YTM_URL, initial_headers, &()).await?.text;
+        let result_text = client
+            .get_query(YTM_URL, initial_headers, &YTM_BOOTSTRAP_PARAMS)
+            .await?
+            .text;
         // Extract the parameter from inside the ytcfg.set() function.
         // Original implementation: https://github.com/sigma67/ytmusicapi/blob/459bc40e4ce31584f9d87cf75838a1f404aa472d/ytmusicapi/helpers.py#L44
         let ytcfg_raw = result_text
@@ -35,12 +40,15 @@ impl NoAuthToken {
         let mut ytcfg: serde_json::Map<String, serde_json::Value> =
             serde_json::from_str(&format!("{{{ytcfg_raw}}}"))
                 .map_err(|_| Error::ytcfg(ytcfg_raw))?;
-        let visitor_id = serde_json::from_value(
+        let visitor_data = ytcfg.remove("VISITOR_DATA").or_else(|| {
             ytcfg
-                .remove("VISITOR_DATA")
-                .ok_or_else(Error::no_visitor_data)?,
-        )
-        .map_err(|_| Error::no_visitor_data())?;
+                .get("INNERTUBE_CONTEXT")
+                .and_then(|context| context.pointer("/client/visitorData"))
+                .cloned()
+        });
+
+        let visitor_id = serde_json::from_value(visitor_data.ok_or_else(Error::no_visitor_data)?)
+            .map_err(|_| Error::no_visitor_data())?;
         Ok(Self {
             create_time: Utc::now(),
             visitor_id,
