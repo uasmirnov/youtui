@@ -588,11 +588,18 @@ fn parse_song_search_result_from_music_shelf_contents(
         };
         if let Some(duration) = fields_vec.pop() {
             let album_idx = num_runs - 3;
-            let album = ParsedSongAlbum {
-                name: album_or_duration,
-                id: mrlir.take_value_pointer(format!("/{album_idx}{NAVIGATION_BROWSE_ID}"))?,
+            let album_path = format!("/{album_idx}{NAVIGATION_BROWSE_ID}");
+
+            let album = if mrlir.path_exists(&album_path) {
+                Some(ParsedSongAlbum {
+                    name: album_or_duration,
+                    id: mrlir.take_value_pointer(album_path)?,
+                })
+            } else {
+                None
             };
-            return Ok(Some((artist, Some(album), duration)));
+
+            return Ok(Some((artist, album, duration)));
         }
         Ok(Some((artist, None, album_or_duration)))
     }

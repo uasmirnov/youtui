@@ -1,3 +1,4 @@
+use super::parse_song_search_result_from_music_shelf_contents;
 use crate::auth::BrowserToken;
 use crate::parse::SearchResults;
 use crate::process_json;
@@ -5,7 +6,10 @@ use crate::query::search::{
     AlbumsFilter, ArtistsFilter, CommunityPlaylistsFilter, EpisodesFilter, FeaturedPlaylistsFilter,
     PlaylistsFilter, PodcastsFilter, ProfilesFilter, SearchQuery, SongsFilter, VideosFilter,
 };
+
+use json_crawler::{JsonCrawler, JsonCrawlerOwned};
 use pretty_assertions::assert_eq;
+use serde_json::json;
 use std::path::Path;
 
 #[tokio::test]
@@ -282,4 +286,72 @@ async fn test_search_profiles() {
         SearchQuery::new("").with_filter(ProfilesFilter),
         BrowserToken
     );
+}
+
+#[test]
+fn test_search_song_without_album_browse_id() {
+    let json = json!({
+        "musicResponsiveListItemRenderer": {
+            "flexColumns": [
+                {
+                    "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": {
+                            "runs": [
+                                {"text": "Barbie Girl"}
+                            ]
+                        }
+                    }
+                },
+                {
+                    "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": {
+                            "runs": [
+                                {"text": "Aqua"},
+                                {"text": " • "},
+                                {"text": "Aquarium"},
+                                {"text": " • "},
+                                {"text": "3:17"}
+                            ]
+                        }
+                    }
+                },
+                {
+                    "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": {
+                            "runs": [
+                                {"text": "100M plays"}
+                            ]
+                        }
+                    }
+                }
+            ],
+            "playlistItemData": {
+                "videoId": "abcdefghijk"
+            },
+            "thumbnail": {
+                "musicThumbnailRenderer": {
+                    "thumbnail": {
+                        "thumbnails": [
+                            {
+                                "url": "https://example.com/cover.jpg",
+                                "width": 120,
+                                "height": 120
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    });
+
+    let source = json.to_string();
+    let mut crawler = JsonCrawlerOwned::new(source, json);
+
+    let song = parse_song_search_result_from_music_shelf_contents(crawler.borrow_mut())
+        .expect("song should parse without album browseId");
+
+    assert_eq!(song.title, "Barbie Girl");
+    assert_eq!(song.artist, "Aqua");
+    assert_eq!(song.duration, "3:17");
+    assert!(song.album.is_none());
 }
