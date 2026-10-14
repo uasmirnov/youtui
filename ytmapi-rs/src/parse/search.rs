@@ -614,7 +614,13 @@ fn parse_song_search_result_from_music_shelf_contents(
             parse_song_fields,
         )?;
 
-    let plays = parse_flex_column_item(&mut mrlir, 2, 0)?;
+    let plays_path = format!("{}/text/runs/0/text", flex_column_item_pointer(2));
+
+    let plays = if mrlir.path_exists(&plays_path) {
+        mrlir.take_value_pointer(plays_path)?
+    } else {
+        String::new()
+    };
 
     let explicit = if mrlir.path_exists(BADGE_LABEL) {
         Explicit::IsExplicit

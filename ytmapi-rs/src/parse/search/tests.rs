@@ -355,3 +355,58 @@ fn test_search_song_without_album_browse_id() {
     assert_eq!(song.duration, "3:17");
     assert!(song.album.is_none());
 }
+
+#[test]
+fn test_search_song_without_plays() {
+    let json = json!({
+        "musicResponsiveListItemRenderer": {
+            "flexColumns": [
+                {
+                    "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": {
+                            "runs": [{"text": "Barbie Girl"}]
+                        }
+                    }
+                },
+                {
+                    "musicResponsiveListItemFlexColumnRenderer": {
+                        "text": {
+                            "runs": [
+                                {"text": "Aqua"},
+                                {"text": " • "},
+                                {"text": "3:17"}
+                            ]
+                        }
+                    }
+                }
+            ],
+            "playlistItemData": {
+                "videoId": "abcdefghijk"
+            },
+            "thumbnail": {
+                "musicThumbnailRenderer": {
+                    "thumbnail": {
+                        "thumbnails": [
+                            {
+                                "url": "https://example.com/cover.jpg",
+                                "width": 120,
+                                "height": 120
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    });
+
+    let source = json.to_string();
+    let mut crawler = JsonCrawlerOwned::new(source, json);
+
+    let song = parse_song_search_result_from_music_shelf_contents(crawler.borrow_mut())
+        .expect("song without play count should parse");
+
+    assert_eq!(song.title, "Barbie Girl");
+    assert_eq!(song.artist, "Aqua");
+    assert_eq!(song.duration, "3:17");
+    assert_eq!(song.plays, "");
+}
